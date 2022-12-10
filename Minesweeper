@@ -1,0 +1,959 @@
+       program-id. Game as "Game".
+       data division.
+
+       FILE SECTION.
+      
+       working-storage section.
+       
+       77 CouleurFondEcran pic 99 value 15.
+       77 CouleurCaractere pic 99 value 0.
+      *Constant used in the app
+       01 CONST.
+         05 Global-Var.
+      *        >Constant keys for direction
+           09 KEY-UP pic x(1) value "z".
+           09 KEY-LEFT pic x(1) value "q".
+           09 KEY-DOWN pic x(1) value "s".
+           09 KEY-RIGHT pic x(1) value "d".
+
+      *        >Constant states for game
+           09 S-GAME-IDLE pic 9 value 0.
+           09 S-GAME-PLAY pic 9 value 1.
+           09 S-GAME-WIN pic 9 value 2.
+           09 S-GAME-LOOSE pic 9 value 3.
+         05 Minesweeper.
+      *        >Constant visual symbols
+           09 VIS-MINE-DEFAULT pic x(1) value "-".
+           09 VIS-MINE-FLAG pic x(1) value "^".
+           09 VIS-MINE-EMPTY pic x(1) value " ".
+           09 VIS-MINE-MINE pic x(1) value "*".
+           09 POS-INDEX-LIST VALUE "123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".
+             15 POS-INDEX PIC X OCCURS 61.
+
+       01 Games.
+         09 MineSwVar.
+      *    > Option of the game
+           17 MineParms.
+             25 Width pic 99 value 8.
+             25 Height pic 99 value 8.
+             25 Mines pic 999 value 10.
+
+      *    > Technical minefield
+           17 RealMF.
+             25 rows occurs 1 to 20 times depending on height of MineParms of MineSwVar of Games.
+               33 cell pic 9 occurs 61 times.
+
+      *    > Visual minefield ( screen )
+           17 VisualMF.
+             25 rows occurs 1 to 20 times depending on height of MineParms of MineSwVar of Games.
+               33 cell pic x occurs 61 times.
+
+      *    > Clear empty area
+           17 ClearMF.
+             25 rows occurs 1 to 20 times depending on height of MineParms of MineSwVar of Games.
+               33 cell pic x occurs 61 times.
+
+      *    > Used to generate the minefield
+           17 GenerateField.
+             25 fieldX pic 99.
+             25 fieldY pic 99.
+             25 generated pic 9.
+             25 toGenerate pic 9(5).
+             25 generateMines pic 9.
+             25 maxMines pic 9(5).
+             25 halfMines pic 9(5).
+
+      *    > Used to handle user input
+           17 Action.
+             25 X pic x.
+             25 Y pic x.
+             25 XVal pic 99.
+             25 YVal pic 99.
+             25 action pic x.
+             25 Valid pic 9.
+
+      *    > Used for single instruction
+           17 tmp.
+             25 CurrentRow pic 99.
+             25 CurrentCols pic 99.
+             25 CurrentIndex pic 99.
+             25 maxMines pic 9(5).
+
+      *    > Used when clearing empty area
+           17 Pop.
+      *      > Current cell
+             25 PopX pic 99.
+             25 PopY pic 99.
+
+      *      > Current area
+             25 PopMinX pic 99.
+             25 PopMinY pic 99.
+             25 PopMaxX pic 99.
+             25 PopMaxY pic 99.
+
+      *      > Current loop state ( stop when no pop )
+             25 Popped pic 9.
+
+      *      > Current cell state ( stop checking once popped )
+             25 PoppedC pic 9.
+
+      *      > No more pop
+             25 Completed pic 9.
+
+      *    > Option validation
+           17 GOptionV pic 9.
+
+      *    > Option choice
+           17 gameOptionChoice pic 9 value 2.
+
+      *    > Visual mine amount
+           17 MinesC pic s999.
+
+      *    > Field left
+           17 undiscovered pic 9999.
+
+      *    > Cell color
+           17 TextClr pic 99.
+           17 BackClr pic 99.
+
+      *  > Current game state
+         09 playing pic 9.
+
+      *  > Last zqsd input
+         09 zqsd pic x.
+
+      *  > Trash for text
+         09 trash-t pic x.
+
+      *  > Trash for numeric
+         09 trash-n pic 9.
+
+      *  > Screen position
+         09 ScreenRow pic 99.
+         09 ScreenCol pic 99.
+
+      *  >Menu option
+         09 menu-option pic 9.
+      *  >Password
+         09 password pic x(10).
+
+      *  > DateTime structure
+         09 SDateTime.
+           13 SDate.
+             17 cYear PIC 9(4).
+             17 cMonth PIC 99.
+             17 cDay PIC 99.
+           13 STime.
+             17 cHour PIC 99.
+             17 cMinute PIC 99.
+             17 cSecond PIC 99.
+             17 cMilli PIC 99.
+
+      *  > Datetime numerical
+         09 VDateTime redefines SDateTime pic 9(16).
+         09 Seed pic 9(16).
+         
+       SCREEN SECTION.
+       
+       01 GameScreen.
+
+      *  > Game main menu
+         09 MainMenu background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 BLANK SCREEN.
+           17 LINE 3, col 33, VALUE "Mini-jeux".
+           17 COL 68, VALUE "Option : ".
+           17 COL 77 , PIC Z using menu-option.
+           17 LINE + 2, col 3, VALUE "- 1 - Snake".
+           17 LINE + 1, col 3, VALUE "- 2 - Minesweeper".
+           17 LINE + 2, col 3, VALUE "- 0 - Retour".
+
+      *  > MineSweeper main menu
+         09 MineSwMenu background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 BLANK SCREEN.
+           17 line 2 col 20 value "MineSweeper".
+           17 line 4 col 2 value "Choisissez votre difficulte : ".
+           17 line 4 col 32 using gameOptionChoice of MineSwVar of Games.
+
+           17 line 6 col 2 value "1-Easy        8x8    10 Mines".
+           17 line 7 col 2 value "2-Medium     16x16   40 Mines".
+           17 line 8 col 2 value "3-Hard       30x16   99 Mines".
+           17 line 9 col 2 value "4-Custom       x        Mines".
+           17 line 9 col 15 pic z9 using width of MineParms of MineSwVar of Games.
+           17 line 9 col 18 pic z9 using height of MineParms of MineSwVar of Games.
+           17 line 9 col 22 pic zz9 using mines of MineParms of MineSwVar of Games.
+
+      *  > MineSweeper screen
+         09 MineSwScreen background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 Blank Screen.
+           17 Line 1 col 12 value "MineSweeper".
+
+      *  > Single cell
+         09 MineSwCell background-color is BackClr of MineSwVar of Games foreground-color is TextClr of MineSwVar of Games.
+           17 Line ScreenRow of Games col ScreenCol of Games from cell of VisualMF(CurrentRow of tmp of MineSwVar of Games, CurrentCols of tmp of MineSwVar of Games).
+
+      *  > Display index ( name ) of col
+         09 MineSwIndexCol background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 Line 2 col ScreenCol of Games from POS-INDEX of POS-INDEX-LIST(CurrentCols of tmp of MineSwVar of Games).
+           17 Line 3 col ScreenCol value ":".
+
+      *  > Display index ( name ) of row
+         09 MineSwIndexRow background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 Line ScreenRow of Games col 2 from POS-INDEX of POS-INDEX-LIST(CurrentRow of tmp of MineSwVar of Games).
+           17 Line ScreenRow col 3 value "=".
+
+      *  > Action input
+         09 MineSwAction background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 Line height of MineParms of MineSwVar of Games, col 1 value " ".
+           17 Line + 4, col 3 value "X Y [d]emine / [f]lag".
+           17 Line + 1, col 3 using X of Action of MineSwVar of Games.
+           17 col 5 using Y of Action of MineSwVar of Games.
+           17 col 7 using Action of Action of MineSwVar of Games.
+
+      *  > Mine counter
+         09 MineSwCounter background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 Line 1, col 2 from MinesC of MineSwVar of Games.
+
+      *  > Game over
+         09 GameOverMs background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 line 2 col 3 value "    GAME OVER!    ".
+
+      *  > Password
+         09 password background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 line 1 col 3 value "Password : ".
+           17 line 1 col 3 using password of Games.
+
+       procedure division.
+
+
+      *    ====================================================
+      *    ====================================================
+      *    ===================    Game       ==================
+      *    ====================================================
+      *    ====================================================
+
+       GameMain.
+           perform GameMain-init.
+           perform playMineSweeper.
+           perform GameMain-end.
+       updateDateTime.
+           MOVE FUNCTION CURRENT-DATE to SDateTime.
+       GameMain-init.
+      
+           
+      *  > Init var
+           move 1 to menu-option of Games.
+           perform updateDateTime.
+           move VDateTime of Games to Seed of Games.
+
+      *  > Init random
+           move function random (Seed of Games) to trash-n.
+       GameMain-end.
+           goback.
+
+      *    ====================================================
+      *    ====================================================
+      *    ===================  MineSweeper  ==================
+      *    ====================================================
+      *    ====================================================
+       playMineSweeper.
+           perform playMineSweeper-init.
+           perform playMineSweeper-trt until playing of Games <>
+             S-GAME-PLAY.
+           perform playMineSweeper-end.
+
+       playMineSweeper-init.
+           move 1 to BackClr.
+           move 2 to TextClr.
+           move S-GAME-PLAY to playing of Games.
+           move " " to Action of Action of MineSwVar of Games.
+           perform playMineSweeperOption.
+           initialize RealMF of MineSwVar of Games.
+           initialize VisualMF of MineSwVar of Games
+             replacing alphanumeric data by VIS-MINE-DEFAULT of
+             Minesweeper of CONST.
+           perform GenerateMinefield.
+           display MineSwScreen.
+           perform DisplayMinefield.
+           display MineSwCounter.
+       playMineSweeper-trt.
+           perform AcceptMineSwAction.
+           evaluate action of Action of MineSwVar of Games
+               when "d"
+               when "D"
+                   perform MsShoot
+               when "f"
+               when "F"
+                   perform MsFlag
+           end-evaluate.
+           perform RenderMinefieldCell.
+           if undiscovered of MineSwVar of Games <= 0 then
+               move S-GAME-WIN to playing of Games
+           end-if.
+       playMineSweeper-end.
+           display GameOverMs of GameScreen.
+           accept zqsd, line 25 col 26.
+
+       MsShoot.
+           evaluate cell of VisualMF(YVal of Action of MineSwVar of
+               Games,
+             XVal of Action of MineSwVar of Games)
+               when VIS-MINE-DEFAULT
+                   evaluate cell of RealMF(YVal of Action of MineSwVar of
+                       Games,
+                     XVal of Action of MineSwVar of Games)
+                       when 9
+                           move VIS-MINE-MINE to
+                             cell of VisualMF(YVal of Action of MineSwVar of
+                               Games,
+                             XVal of Action of MineSwVar of Games)
+                           move S-GAME-LOOSE to playing of Games
+                       when 0
+                           move VIS-MINE-EMPTY to
+                             cell of VisualMF(YVal of Action of MineSwVar of
+                               Games,
+                             XVal of Action of MineSwVar of Games)
+                           subtract 1 from undiscovered of MineSwVar of Games
+                           perform MsPopNear
+                       when other
+                           move cell of RealMF(YVal of Action of MineSwVar of
+                               Games,
+                             XVal of Action of MineSwVar of Games) to
+                             cell of VisualMF(YVal of Action of MineSwVar of
+                               Games,
+                             XVal of Action of MineSwVar of Games)
+                           subtract 1 from undiscovered of MineSwVar of Games
+                   end-evaluate
+               when other
+                   continue
+           end-evaluate.
+       MsPopNear.
+           perform MsPopNear-init.
+           perform MsPopNear-trt until Completed of Pop of MineSwVar of
+             Games = 1.
+           perform MsPopNear-end.
+
+       MsPopNear-init.
+           move 0 to Completed of Pop of MineSwVar of Games.
+           move XVal of Action of MineSwVar of Games
+             to PopX of Pop of MineSwVar of Games.
+           move YVal of Action of MineSwVar of Games
+             to PopY of Pop of MineSwVar of Games.
+           initialize ClearMF of MineSwVar of Games
+             replacing alphanumeric data by VIS-MINE-DEFAULT of
+             Minesweeper of CONST.
+           move VIS-MINE-EMPTY of Minesweeper of CONST to
+             cell of ClearMF(PopY of Pop of MineSwVar of Games,
+             PopX of Pop of MineSwVar of Games).
+           move PopX of Pop of MineSwVar of Games to
+             PopMinX of Pop of MineSwVar of Games.
+           move PopX of Pop of MineSwVar of Games to
+             PopMaxX of Pop of MineSwVar of Games.
+           move PopY of Pop of MineSwVar of Games to
+             PopMinY of Pop of MineSwVar of Games.
+           move PopY of Pop of MineSwVar of Games to
+             PopMaxY of Pop of MineSwVar of Games.
+
+       MsPopNear-trt.
+           move 0 to Popped of Pop of MineSwVar of Games.
+           perform MsPopNearIncreaseArea.
+           perform varying PopX of Pop of MineSwVar of Games from
+             PopMinX of Pop of MineSwVar of Games by 1 until
+             PopX of Pop of MineSwVar of Games >
+             PopMaxX of Pop of MineSwVar of Games
+               perform varying PopY of Pop of MineSwVar of Games from
+                 PopMinY of Pop of MineSwVar of Games by 1 until
+                 PopY of Pop of MineSwVar of Games >
+                 PopMaxY of Pop of MineSwVar of Games
+                   if cell of ClearMF(PopY
+                       of Pop of MineSwVar of Games,
+                     PopX of Pop of MineSwVar of Games) =
+                     VIS-MINE-DEFAULT then
+                       perform MsPopCell
+                   end-if
+               end-perform
+           end-perform.
+           if Popped of Pop of MineSwVar of Games = 0 then
+               move 1 to Completed of Pop of MineSwVar of Games
+           end-if.
+
+       MsPopNear-end.
+
+       MsPopCell.
+           move 0 to PoppedC of Pop of MineSwVar of Games.
+      *    ul
+           subtract 1 from PopX of Pop of MineSwVar of Games
+             giving CurrentCols of tmp of MineSwVar of Games.
+           subtract 1 from PopY of Pop of MineSwVar of Games
+             giving CurrentRow of tmp of MineSwVar of Games.
+           perform MsTryPop.
+      *    u
+           if PoppedC of Pop of MineSwVar of Games <> 1 then
+               move PopX of Pop of MineSwVar of Games
+                 to CurrentCols of tmp of MineSwVar of Games
+               subtract 1 from PopY of Pop of MineSwVar of Games
+                 giving CurrentRow of tmp of MineSwVar of Games
+               perform MsTryPop
+           end-if.
+      *    ur
+           if PoppedC of Pop of MineSwVar of Games <> 1 then
+               add 1 to PopX of Pop of MineSwVar of Games
+                 giving CurrentCols of tmp of MineSwVar of Games
+               subtract 1 from PopY of Pop of MineSwVar of Games
+                 giving CurrentRow of tmp of MineSwVar of Games
+               perform MsTryPop
+           end-if.
+      *    r
+           if PoppedC of Pop of MineSwVar of Games <> 1 then
+               add 1 to PopX of Pop of MineSwVar of Games
+                 giving CurrentCols of tmp of MineSwVar of Games
+               move PopY of Pop of MineSwVar of Games
+                 to CurrentRow of tmp of MineSwVar of Games
+               perform MsTryPop
+           end-if.
+
+      *    br
+           if PoppedC of Pop of MineSwVar of Games <> 1 then
+               add 1 to PopX of Pop of MineSwVar of Games
+                 giving CurrentCols of tmp of MineSwVar of Games
+               add 1 to PopY of Pop of MineSwVar of Games
+                 giving CurrentRow of tmp of MineSwVar of Games
+               perform MsTryPop
+           end-if.
+      *    b
+           if PoppedC of Pop of MineSwVar of Games <> 1 then
+               move PopX of Pop of MineSwVar of Games
+                 to CurrentCols of tmp of MineSwVar of Games
+               add 1 to PopY of Pop of MineSwVar of Games
+                 giving CurrentRow of tmp of MineSwVar of Games
+               perform MsTryPop
+           end-if.
+
+      *    bl
+           if PoppedC of Pop of MineSwVar of Games <> 1 then
+               subtract 1 from PopX of Pop of MineSwVar of Games
+                 giving CurrentCols of tmp of MineSwVar of Games
+               add 1 to PopY of Pop of MineSwVar of Games
+                 giving CurrentRow of tmp of MineSwVar of Games
+               perform MsTryPop
+           end-if.
+
+      *    l
+           if PoppedC of Pop of MineSwVar of Games <> 1 then
+               subtract 1 from PopX of Pop of MineSwVar of Games
+                 giving CurrentCols of tmp of MineSwVar of Games
+               move PopY of Pop of MineSwVar of Games
+                 to CurrentRow of tmp of MineSwVar of Games
+               perform MsTryPop
+           end-if.
+           if PoppedC of Pop of MineSwVar of Games <> 0 then
+               perform RenderMfPopped
+           end-if.
+
+       RenderMfPopped.
+           move PopX of Pop of MineSwVar of Games to
+             CurrentCols of tmp of MineSwVar of Games.
+           move PopY of Pop of MineSwVar of Games to
+             CurrentRow of tmp of MineSwVar of Games.
+
+           add 3 to CurrentRow of tmp of MineSwVar of Games
+             giving ScreenRow of Games.
+           add 3 to CurrentCols of tmp of MineSwVar of Games
+             giving ScreenCol of Games.
+           perform RenderMinefieldCellRaw.
+
+       MsTryPop.
+           if CurrentCols of tmp of MineSwVar of Games >=
+             PopMinX of Pop of MineSwVar of Games and
+             CurrentCols of tmp of MineSwVar of Games <=
+             PopMaxX of Pop of MineSwVar of Games and
+             CurrentRow of tmp of MineSwVar of Games >=
+             PopMinY of Pop of MineSwVar of Games and
+             CurrentRow of tmp of MineSwVar of Games <=
+             PopMaxY of Pop of MineSwVar of Games and
+             cell of ClearMF(CurrentRow of tmp of MineSwVar of Games,
+             CurrentCols of tmp of MineSwVar of Games) =
+             VIS-MINE-EMPTY then
+               move 1 to Popped of Pop of MineSwVar of Games
+               move 1 to PoppedC of Pop of MineSwVar of Games
+               subtract 1 from undiscovered of MineSwVar of Games
+               evaluate cell of RealMF(PopY of Pop of MineSwVar
+                   of Games,
+                 PopX of Pop of MineSwVar of Games) = 0
+                   when true
+                       move VIS-MINE-EMPTY
+                         to cell of ClearMF(PopY of Pop of MineSwVar
+                           of Games,
+                         PopX of Pop of MineSwVar of Games)
+                   when false
+                       move cell of RealMF(PopY of Pop of MineSwVar
+                           of Games,
+                         PopX of Pop of MineSwVar of Games)
+                         to cell of ClearMF(PopY of Pop of MineSwVar
+                           of Games,
+                         PopX of Pop of MineSwVar of Games)
+               end-evaluate
+               move cell of ClearMF(PopY of Pop of MineSwVar
+                   of Games,
+                 PopX of Pop of MineSwVar of Games)
+                 to cell of VisualMF(PopY of Pop of MineSwVar
+                   of Games,
+                 PopX of Pop of MineSwVar of Games)
+
+           end-if.
+
+       MsPopNearIncreaseArea.
+           subtract 1 from PopMinX of Pop of MineSwVar of Games.
+           if PopMinX of Pop of MineSwVar of Games < 1 then
+               move 1 to PopMinX of Pop of MineSwVar of Games
+           end-if.
+           add 1 to PopMaxX of Pop of MineSwVar of Games.
+
+           if PopMaxX of Pop of MineSwVar of Games > width of
+             MineParms of MineSwVar of Games then
+               move width of MineParms of MineSwVar of Games
+                 to PopMaxX of Pop of MineSwVar of Games
+           end-if.
+           subtract 1 from PopMinY of Pop of MineSwVar of Games.
+           if PopMinY of Pop of MineSwVar of Games < 1 then
+               move 1 to PopMinY of Pop of MineSwVar of Games
+           end-if.
+           add 1 to PopMaxY of Pop of MineSwVar of Games.
+           if PopMaxY of Pop of MineSwVar of Games > height of
+             MineParms of MineSwVar of Games then
+               move height of MineParms of MineSwVar of Games
+                 to PopMaxY of Pop of MineSwVar of Games
+           end-if.
+
+       MsFlag.
+           evaluate cell of VisualMF(YVal of Action of MineSwVar of
+               Games,
+             XVal of Action of MineSwVar of Games)
+               when VIS-MINE-DEFAULT
+                   move VIS-MINE-FLAG to
+                     cell of VisualMF(YVal of Action of MineSwVar of
+                       Games,
+                     XVal of Action of MineSwVar of Games)
+                   subtract 1 from MinesC of MineSwVar of Games
+               when VIS-MINE-FLAG
+                   move VIS-MINE-DEFAULT to
+                     cell of VisualMF(YVal of Action of MineSwVar of
+                       Games,
+                     XVal of Action of MineSwVar of Games)
+                   add 1 to MinesC of MineSwVar of Games
+           end-evaluate.
+           display MineSwCounter.
+       AcceptMineSwAction.
+           perform AcceptMineSwAction-init.
+           perform AcceptMineSwAction-trt until Valid of Action of
+             MineSwVar of Games = 1.
+           perform AcceptMineSwAction-end.
+
+       AcceptMineSwAction-init.
+           move 0 to Valid of Action of MineSwVar of Games.
+       AcceptMineSwAction-trt.
+           display MineSwAction of GameScreen.
+           accept MineSwAction of GameScreen.
+           perform ParseMsAction.
+           move 1 to Valid of Action of MineSwVar of Games.
+           evaluate true
+               when XVal of Action of MineSwVar of Games < 1
+                   move 1 to XVal of Action of MineSwVar of Games
+                   move 0 to Valid of Action of MineSwVar of Games
+               when XVal of Action of MineSwVar of Games > width of
+                     MineParms of MineSwVar of Games
+                   move width of MineParms of MineSwVar of Games
+                     to XVal of Action of MineSwVar of Games
+                   move 0 to Valid of Action of MineSwVar of Games
+           end-evaluate.
+           evaluate true
+               when YVal of Action of MineSwVar of Games < 1
+                   move 1 to YVal of Action of MineSwVar of Games
+                   move 0 to Valid of Action of MineSwVar of Games
+               when YVal of Action of MineSwVar of Games > height of
+                     MineParms of MineSwVar of Games
+                   move height of MineParms of MineSwVar of Games
+                     to YVal of Action of MineSwVar of Games
+                   move 0 to Valid of Action of MineSwVar of Games
+           end-evaluate.
+           evaluate action of action of MineSwVar of Games
+               when "d"
+               when "D"
+                   if cell of VisualMF(YVal of Action of MineSwVar of Games,
+                     XVal of Action of MineSwVar of Games) <> VIS-MINE-DEFAULT
+                     then
+                       move 0 to Valid of Action of MineSwVar of Games
+                   end-if
+
+               when "f"
+               when "F"
+                   evaluate cell of VisualMF(YVal of Action of MineSwVar of
+                       Games,
+                     XVal of Action of MineSwVar of Games)
+                       when VIS-MINE-DEFAULT
+                           continue
+                       when VIS-MINE-FLAG
+                           continue
+                       when other
+                           move 0 to Valid of Action of MineSwVar of Games
+                   end-evaluate
+               when Other
+                   move 0 to Valid of Action of MineSwVar of Games
+           end-evaluate.
+       AcceptMineSwAction-end.
+
+       ParseMsAction.
+           move 0 to XVal of Action of MineSwVar of Games.
+           move 0 to YVal of Action of MineSwVar of Games.
+
+           PERFORM VARYING CurrentIndex FROM 1 BY 1 UNTIL CurrentIndex
+             > width of MineParms of MineSwVar of Games
+               IF X of Action of MineSwVar of Games
+                 = POS-INDEX(CurrentIndex) THEN
+                   MOVE CurrentIndex to XVal of Action of MineSwVar of
+                     Games
+               END-IF
+           END-PERFORM.
+           PERFORM VARYING CurrentIndex FROM 1 BY 1 UNTIL CurrentIndex
+             > height of MineParms of MineSwVar of Games
+               IF Y = POS-INDEX(CurrentIndex)
+                 THEN
+                   MOVE CurrentIndex to YVal of Action of MineSwVar of
+                     Games
+               END-IF
+           END-PERFORM.
+
+       playMineSweeperOption.
+           perform playMineSweeperOption-init.
+           perform playMineSweeperOption-trt until GOptionV = 1.
+           perform playMineSweeperOption-end.
+
+       playMineSweeperOption-init.
+           move 0 to GOptionV.
+       playMineSweeperOption-trt.
+           display MineSwMenu of GameScreen.
+           accept MineSwMenu of GameScreen.
+           move 1 to GOptionV of MineSwVar of Games
+           evaluate gameOptionChoice of MineSwVar of Games
+               when 1
+                   move 8 to width of MineParms of MineSwVar
+                     of Games
+                   move 8 to height of MineParms of MineSwVar
+                     of Games
+                   move 10 to mines of MineParms of MineSwVar
+                     of Games
+               when 2
+                   move 16 to width of MineParms of MineSwVar
+                     of Games
+                   move 16 to height of MineParms of MineSwVar
+                     of Games
+                   move 40 to mines of MineParms of MineSwVar
+                     of Games
+               when 3
+                   move 30 to width of MineParms of MineSwVar
+                     of Games
+                   move 16 to height of MineParms of MineSwVar
+                     of Games
+                   move 99 to mines of MineParms of MineSwVar
+                     of Games
+               when 4
+                   evaluate true
+                       when width of MineParms of MineSwVar of Games < 1
+                           move 0 to GOptionV of MineSwVar of Games
+                           move 1 to width of MineParms of MineSwVar of Games
+                       when width of MineParms of MineSwVar of Games > 61
+                           move 0 to GOptionV of MineSwVar of Games
+                           move 61 to width of MineParms of MineSwVar of Games
+                       when width of MineParms of MineSwVar
+                             of Games is not numeric
+                           move 0 to GOptionV of MineSwVar of Games
+                           move 10 to width of MineParms of MineSwVar of Games
+                   end-evaluate
+                   evaluate true
+                       when height of MineParms of MineSwVar of Games < 1
+                           move 0 to GOptionV of MineSwVar of Games
+                           move 1 to height of MineParms of MineSwVar of Games
+                       when height of MineParms of MineSwVar of Games > 20
+                           move 0 to GOptionV of MineSwVar of Games
+                           move 20 to height of MineParms of
+                             MineSwVar of Games
+                       when height of MineParms of MineSwVar of Games
+                             is not numeric
+                           move 0 to GOptionV of MineSwVar of Games
+                           move 10 to height of MineParms of
+                             MineSwVar of Games
+                   end-evaluate
+                   multiply height of MineParms of MineSwVar
+                     of Games by width of MineParms of
+                     MineSwVar of Games giving maxMines of tmp of
+                     MineSwVar
+                   if mines of MineParms of MineSwVar
+                     of Games > maxMines of tmp of MineSwVar then
+                       move 0 to GOptionV of MineSwVar of Games
+                       move maxMines of tmp of MineSwVar
+                         to height of MineParms of MineSwVar of Games
+                   else
+                       if mines of MineParms of MineSwVar
+                         of Games is not numeric then
+                           move 0 to GOptionV of MineSwVar of Games
+                           divide maxMines of tmp of MineSwVar of Games
+                             by 6 giving mines of MineParms of
+                             MineSwVar of Games
+                       end-if
+                   end-if
+               when other
+                   move 0 to GOptionV of MineSwVar of Games
+           end-evaluate.
+       playMineSweeperOption-end.
+           multiply height of MineParms of MineSwVar
+             of Games by width of MineParms of MineSwVar
+             of Games giving maxMines of tmp of MineSwVar.
+           subtract mines of MineParms of MineSwVar of Games
+             from maxMines of tmp of MineSwVar of Games
+             giving undiscovered of MineSwVar of Games.
+           move mines of MineParms of MineSwVar of Games to
+             MinesC of MineSwVar of Games.
+       GenerateMinefield.
+           perform GenerateMinefield-init.
+           perform GenerateMinefield-trt until generated of
+             GenerateField of MineSwVar of Games = 1.
+           perform GenerateMinefield-end.
+
+       GenerateMinefield-init.
+           move 0 to generated of GenerateField of MineSwVar of Games.
+           multiply height of MineParms of MineSwVar
+             of Games by width of MineParms of
+             MineSwVar of Games giving maxMines of GenerateField of
+             MineSwVar.
+           divide maxMines of GenerateField of MineSwVar of Games
+             by 2 giving halfMines of GenerateField of MineSwVar
+             of Games.
+           move mines of MineParms of MineSwVar of Games to
+             toGenerate of GenerateField of MineSwVar of Games.
+           if toGenerate of GenerateField of MineSwVar of
+             Games > halfMines of GenerateField of MineSwVar then
+               move 0 to generateMines of GenerateField of
+                 MineSwVar of Games
+               subtract toGenerate of GenerateField of MineSwVar of
+                 Games from maxMines of GenerateField of MineSwVar of
+                 Games giving toGenerate of GenerateField of MineSwVar of
+                 Games
+               initialize RealMF of MineSwVar of Games replacing
+                 numeric data by 9
+           else
+               move
+                 9 to generateMines of GenerateField of
+                 MineSwVar of Games
+           end-if.
+       GenerateMinefield-trt.
+           perform GenerateMineLocation with test after until cell of
+             RealMF(fieldY, fieldX) <> generateMines
+             of GenerateField of MineSwVar of Games.
+           if generateMines = 0 then
+               move 0 to cell of RealMF(fieldY, fieldX)
+           else
+               move generateMines to cell of RealMF(fieldY, fieldX)
+           end-if.
+           perform updateNearCellsValues.
+           subtract 1 from toGenerate of GenerateField of MineSwVar of
+             Games.
+           if toGenerate of GenerateField of MineSwVar of Games < 1 then
+               move 1 to generated of GenerateField of MineSwVar of
+                 Games
+           end-if.
+       GenerateMinefield-end.
+       GenerateMineLocation.
+           compute fieldX = ((function random ())
+             * width of MineParms of MineSwVar of Games).
+           compute fieldY = ((function random ())
+             * height of MineParms of MineSwVar of Games).
+           add 1 to fieldX of GenerateField of MineSwVar of Games.
+           add 1 to fieldY of GenerateField of MineSwVar of Games.
+           if fieldX of GenerateField of MineSwVar of Games < 1 then
+               move 1 to fieldX of GenerateField of MineSwVar of Games
+           end-if.
+           if fieldY of GenerateField of MineSwVar of Games < 1 then
+               move 1 to fieldY of GenerateField of MineSwVar of Games
+           end-if.
+           if fieldX of GenerateField of MineSwVar of Games >
+             width of MineParms of MineSwVar of Games then
+               move width of MineParms of MineSwVar of Games to
+                 fieldX of GenerateField of MineSwVar of Games
+           end-if.
+           if fieldY of GenerateField of MineSwVar of Games >
+             height of MineParms of MineSwVar of Games then
+               move height of MineParms of MineSwVar of Games to
+                 fieldY of GenerateField of MineSwVar of Games
+           end-if.
+
+       DisplayMinefield.
+           perform varying CurrentCols of tmp of MineSwVar of Games
+             from
+             1 by 1 until CurrentCols of tmp of MineSwVar of Games >
+             width of MineParms of MineSwVar of Games
+               add 3 to CurrentCols of tmp of MineSwVar of Games
+                 giving ScreenCol of Games
+               display MineSwIndexCol
+           end-perform.
+           perform varying CurrentRow of tmp of MineSwVar of Games from
+             1 by 1 until CurrentRow of tmp of MineSwVar of Games >
+             height of MineParms of MineSwVar of Games
+               add 3 to CurrentRow of tmp of MineSwVar of Games
+                 giving ScreenRow of Games
+               display MineSwIndexRow
+               perform varying CurrentCols of tmp of MineSwVar of Games
+                 from
+                 1 by 1 until CurrentCols of tmp of MineSwVar of Games >
+                 width of MineParms of MineSwVar of Games
+                   add 3 to CurrentCols of tmp of MineSwVar of Games
+                     giving ScreenCol of Games
+                   perform RenderMinefieldCellRaw
+               end-perform
+           end-perform.
+
+       RenderMinefieldCell.
+           move YVal of Action of MineSwVar of Games to
+             CurrentRow of tmp of MineSwVar of Games.
+           move XVal of Action of MineSwVar of Games to
+             CurrentCols of tmp of MineSwVar of Games.
+           add 3 to YVal of Action of MineSwVar of Games
+             giving ScreenRow of Games.
+           add 3 to XVal of Action of MineSwVar of Games
+             giving ScreenCol of Games.
+           perform RenderMinefieldCellRaw.
+       RenderMinefieldCellRaw.
+           evaluate cell of VisualMF(CurrentRow of tmp of MineSwVar of
+               Games,
+             CurrentCols of tmp of MineSwVar of Games)
+               when 1
+                   move 1 to TextClr of MineSwVar of Games
+                   move 7 to BackClr of MineSwVar of Games
+
+               when 2
+                   move 2 to TextClr of MineSwVar of Games
+                   move 7 to BackClr of MineSwVar of Games
+
+               when 3
+                   move 3 to TextClr of MineSwVar of Games
+                   move 7 to BackClr of MineSwVar of Games
+
+               when 4
+                   move 4 to TextClr of MineSwVar of Games
+                   move 7 to BackClr of MineSwVar of Games
+
+               when 5
+                   move 5 to TextClr of MineSwVar of Games
+                   move 7 to BackClr of MineSwVar of Games
+
+               when 6
+                   move 6 to TextClr of MineSwVar of Games
+                   move 7 to BackClr of MineSwVar of Games
+
+               when 7
+                   move 8 to TextClr of MineSwVar of Games
+                   move 7 to BackClr of MineSwVar of Games
+               when 8
+                   move 9 to TextClr of MineSwVar of Games
+                   move 7 to BackClr of MineSwVar of Games
+               when VIS-MINE-DEFAULT
+                   move 0 to TextClr of MineSwVar of Games
+                   move 7 to BackClr of MineSwVar of Games
+               when VIS-MINE-EMPTY
+                   move 0 to TextClr of MineSwVar of Games
+                   move 15 to BackClr of MineSwVar of Games
+               when VIS-MINE-FLAG
+                   move 6 to TextClr of MineSwVar of Games
+                   move 15 to BackClr of MineSwVar of Games
+               when VIS-MINE-MINE
+                   move 0 to TextClr of MineSwVar of Games
+                   move 15 to BackClr of MineSwVar of Games
+           end-evaluate.
+           display MineSwCell of GameScreen.
+       updateNearCellsValues.
+      *    ul
+           subtract 1 from fieldX giving CurrentCols of tmp of
+             MineSwVar of Games.
+           subtract 1 from fieldY giving CurrentRow of tmp of
+             MineSwVar of Games.
+           perform updateCellValue.
+      *    u
+           move fieldX to CurrentCols of tmp of MineSwVar of Games.
+           subtract 1 from fieldY giving CurrentRow of tmp of
+             MineSwVar of Games.
+           perform updateCellValue.
+      *    ur
+           add 1 to fieldX giving CurrentCols of tmp of
+             MineSwVar of Games.
+           subtract 1 from fieldY giving CurrentRow of tmp of
+             MineSwVar of Games.
+           perform updateCellValue.
+
+      *    r
+           add 1 to fieldX giving CurrentCols of tmp of
+             MineSwVar of Games.
+           move fieldY to CurrentRow of tmp of
+             MineSwVar of Games.
+           perform updateCellValue.
+
+      *    br
+           add 1 to fieldX giving CurrentCols of tmp of
+             MineSwVar of Games.
+           add 1 to fieldY giving CurrentRow of tmp of
+             MineSwVar of Games.
+           perform updateCellValue.
+
+      *    b
+           move fieldX to CurrentCols of tmp of
+             MineSwVar of Games.
+           add 1 to fieldY giving CurrentRow of tmp of
+             MineSwVar of Games.
+           perform updateCellValue.
+
+      *    bl
+           subtract 1 from fieldX giving CurrentCols of tmp of
+             MineSwVar of Games.
+           add 1 to fieldY giving CurrentRow of tmp of
+             MineSwVar of Games.
+           perform updateCellValue.
+
+      *    l
+           subtract 1 from fieldX giving CurrentCols of tmp of
+             MineSwVar of Games.
+           move fieldY to CurrentRow of tmp of
+             MineSwVar of Games.
+           perform updateCellValue.
+
+       updateCellValue.
+           if CurrentRow of tmp of MineSwVar of Games >= 1 and
+             CurrentRow of tmp of MineSwVar of Games <=
+             height of MineParms of MineSwVar of Games and
+             CurrentCols of tmp of MineSwVar of Games >= 1 and
+             CurrentCols of tmp of MineSwVar of Games <=
+             width of MineParms of MineSwVar of Games
+             then
+               evaluate cell of RealMF(CurrentRow of tmp of MineSwVar
+                   of Games,
+                 CurrentCols of tmp of MineSwVar of Games) <> 9
+                   when true
+
+                       evaluate generateMines
+                           when 0
+                               subtract 1 from cell of RealMF(CurrentRow of tmp of
+                                   MineSwVar of Games,
+                                 CurrentCols of tmp of MineSwVar of Games)
+                           when other
+                               add 1 to cell of RealMF(CurrentRow of tmp of
+                                   MineSwVar
+                                   of Games,
+                                 CurrentCols of tmp of MineSwVar of Games)
+                       end-evaluate
+                   when false
+
+                       evaluate generateMines
+                           when 0
+                               add 1 to cell of RealMF(fieldY, fieldX)
+                       end-evaluate
+               end-evaluate
+
+           end-if.
+
+       end program Game.
