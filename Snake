@@ -1,0 +1,431 @@
+       program-id. Game as "Game".
+       data division.
+
+       FILE SECTION.
+      
+       working-storage section.
+       
+       77 CouleurFondEcran pic 99 value 15.
+       77 CouleurCaractere pic 99 value 0.
+      *Constant used in the app
+       01 CONST.
+         05 Global-Var.
+      *        >Constant keys for direction
+           09 KEY-UP pic x(1) value "z".
+           09 KEY-LEFT pic x(1) value "q".
+           09 KEY-DOWN pic x(1) value "s".
+           09 KEY-RIGHT pic x(1) value "d".
+
+      *        >Constant states for game
+           09 S-GAME-IDLE pic 9 value 0.
+           09 S-GAME-PLAY pic 9 value 1.
+           09 S-GAME-WIN pic 9 value 2.
+           09 S-GAME-LOOSE pic 9 value 3.
+         05 Snake.
+      *        >Constant codes for cur-direction
+           09 DIR-UP pic 9(1) value 1.
+           09 DIR-LEFT pic 9(1) value 2.
+           09 DIR-DOWN pic 9(1) value 3.
+           09 DIR-RIGHT pic 9(1) value 4.
+
+      *        >Constant visual symbols
+           09 VIS-SNAKE-HEAD pic x(1) value "Q".
+           09 VIS-SNAKE-FULL pic x(1) value "O".
+           09 VIS-SNAKE-BODY pic x(1) value "o".
+           09 VIS-FOOD pic x(1) value "@".
+           09 VIS-BLANK pic x(1) value ".".
+         05 Minesweeper.
+      *        >Constant visual symbols
+           09 VIS-MINE-DEFAULT pic x(1) value "-".
+           09 VIS-MINE-FLAG pic x(1) value "^".
+           09 VIS-MINE-EMPTY pic x(1) value " ".
+           09 VIS-MINE-MINE pic x(1) value "*".
+           09 POS-INDEX-LIST VALUE "123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".
+             15 POS-INDEX PIC X OCCURS 61.
+
+       01 Games.
+         09 SnVar.
+      *    > The snake, board is 20x20, max-length is 400
+           17 Snake.
+             25 SnPart occurs 400 times indexed by snake-index.
+               33 SnX pic 9(2).
+               33 SnY pic 9(2).
+
+      *      > Keep previous direction to prevent goback
+             25 OldMvmnt pic 9(1) value 3.
+
+      *      > The current direction used for movement
+             25 CurMvmnt pic 9(1) value 3.
+
+      *      > The next cell of the head
+             25 NxtPos.
+               33 NxtX pic 9(2).
+               33 NxtY pic 9(2).
+
+      *    > The cell of the food, can be removed, we can use field
+           17 Food.
+             25 FoodX pic 9(2).
+             25 FoodY pic 9(2).
+
+      *    > The screen of the game, also used for colision
+           17 SnScreen.
+             25 Row occurs 20 times.
+               33 Cell pic x(1) value '.' occurs 20 times.
+
+      *    > The size of the screen, should be a const
+           17 ScrSize pic 99 value 20.
+
+      *    > Current score
+           17 SnScore pic 999.
+
+      *    > Current size
+           17 SnSize pic 999.
+           17 CrntRow pic 99.
+
+      *    > Should we create food
+           17 CrtFood pic 9(1) value 1.
+
+      *    > Did the snake grew
+           17 SnkGrew pic 9(1) value 1.
+
+      *    > Should the snake grow
+           17 SnkGrow pic 9(1) value 0.
+
+      *    > Used for input speed but cant go lower than 1s
+           17 Speed pic 99.
+      *  > Current game state
+         09 playing pic 9.
+
+      *  > Last zqsd input
+         09 zqsd pic x.
+
+      *  > Trash for text
+         09 trash-t pic x.
+
+      *  > Trash for numeric
+         09 trash-n pic 9.
+
+      *  > Screen position
+         09 ScreenRow pic 99.
+         09 ScreenCol pic 99.
+
+      *  >Menu option
+         09 menu-option pic 9.
+      *  >Password
+         09 password pic x(10).
+
+      *  > DateTime structure
+         09 SDateTime.
+           13 SDate.
+             17 cYear PIC 9(4).
+             17 cMonth PIC 99.
+             17 cDay PIC 99.
+           13 STime.
+             17 cHour PIC 99.
+             17 cMinute PIC 99.
+             17 cSecond PIC 99.
+             17 cMilli PIC 99.
+
+      *  > Datetime numerical
+         09 VDateTime redefines SDateTime pic 9(16).
+         09 Seed pic 9(16).
+         
+       SCREEN SECTION.
+       
+       01 GameScreen.
+
+      *  > Game main menu
+         09 MainMenu background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 BLANK SCREEN.
+           17 LINE 3, col 33, VALUE "Mini-jeux".
+           17 COL 68, VALUE "Option : ".
+           17 COL 77 , PIC Z using menu-option.
+           17 LINE + 2, col 3, VALUE "- 1 - Snake".
+           17 LINE + 1, col 3, VALUE "- 2 - Minesweeper".
+           17 LINE + 2, col 3, VALUE "- 0 - Retour".
+
+      *  > Snake screen
+         09 SnakeScreen background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 Blank Screen.
+           17 Line 2 col 12 value "Snake".
+           17 Line 3 col 25 from SnScore of SnVar of Games.
+
+      *  > Snake field line
+         09 ScreenLine background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 Line ScreenRow col 2 from Row(CrntRow of SnVar of Games).
+
+      *  > Game over snake
+         09 GameOverSnake background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 line 15 pic x(60).
+           17 line 16 col 3 value "    GAME OVER! Score:    ".
+           17 line 16 col 22 from SnScore.
+           17 line 17 pic x(60).
+
+      *  > Password
+         09 password background-color is CouleurFondEcran foreground-color is CouleurCaractere.
+           17 line 1 col 3 value "Password : ".
+           17 line 1 col 3 using password of Games.
+
+       procedure division.
+
+
+      *    ====================================================
+      *    ====================================================
+      *    ===================    Game       ==================
+      *    ====================================================
+      *    ====================================================
+
+       GameMain.
+           perform GameMain-init.
+		   perform PlaySnake
+      *    perform GameMain-trt until menu-option of Games = 0.
+           perform GameMain-end.
+       updateDateTime.
+           MOVE FUNCTION CURRENT-DATE to SDateTime.
+       GameMain-init.
+      
+           
+      *  > Init var
+           move 1 to menu-option of Games.
+           perform updateDateTime.
+           move VDateTime of Games to Seed of Games.
+
+      *  > Init random
+           move function random (Seed of Games) to trash-n.
+       GameMain-trt.
+      *  > Ask user option
+           move 0 to menu-option of Games.
+           display MainMenu of GameScreen.
+           accept MainMenu of GameScreen.
+
+      *  > Parse the option
+      *    evaluate menu-option of Games
+      *        when 1
+      *            perform PlaySnake
+      *        when 2
+      *            perform playMineSweeper
+      *    end-evaluate.
+       GameMain-end.
+           goback.
+
+
+      *    ====================================================
+      *    ====================================================
+      *    ===================    Snake      ==================
+      *    ====================================================
+      *    ====================================================
+       PlaySnake.
+           perform PlaySnake-init.
+           perform PlaySnake-trt until playing of Games <> S-GAME-PLAY.
+           perform PlaySnake-end.
+
+       PlaySnake-init.
+
+      *    > Display the snake screen
+           display SnakeScreen of GameScreen.
+
+      *    > -- Reset the variables --
+           move S-GAME-PLAY to playing of Games.
+           move 10 to SnX(1).
+           move 10 to SnY(1).
+           move 1 to Speed of SnVar of Games.
+           move 1 to SnSize.
+           move 0 to SnkGrew.
+           move 0 to SnkGrow.
+           move 0 to SnScore.
+           move KEY-DOWN to zqsd of Games.
+           initialize SnScreen replacing alphanumeric data by
+             VIS-BLANK.
+           move VIS-SNAKE-HEAD to Cell of SnScreen(SnY(1), SnX(1)).
+
+           perform generate-food-location.
+           perform create-food.
+           perform SnakeScreenRender.
+
+       PlaySnake-trt.
+      *    > accept the user input for this frame
+           accept zqsd of Games line 25 col 26 with timeout
+             Speed of SnVar of Games.
+
+      *    > If not paused we perfrom
+           if zqsd of Games <> " " then
+               perform snake-input-trt
+               perform handle-move
+               if CrtFood of SnVar of Games = 1 then
+                   perform create-food
+               end-if
+               perform SnakeScreenRender
+           end-if.
+       PlaySnake-end.
+           display GameOverSnake.
+           accept zqsd, line 25 col 26.
+       snake-input-trt.
+      *    > Test the new zqsd input and validate it
+           evaluate zqsd of Games
+               when KEY-UP
+                   if not OldMvmnt = DIR-DOWN then
+                       move DIR-UP to CurMvmnt
+                   end-if
+               when KEY-LEFT
+                   if not OldMvmnt = DIR-RIGHT then
+                       move DIR-LEFT to CurMvmnt
+                   end-if
+               when KEY-DOWN
+                   if not OldMvmnt = DIR-UP then
+                       move DIR-DOWN to CurMvmnt
+                   end-if
+               when KEY-RIGHT
+                   if not OldMvmnt = DIR-LEFT then
+                       move DIR-RIGHT to CurMvmnt
+                   end-if
+           end-evaluate.
+       create-food.
+           perform generate-food-location until Cell of SnScreen(FoodY,
+             FoodX) = VIS-BLANK.
+           move VIS-FOOD to Cell of SnScreen(FoodY, FoodX).
+           move 0 to CrtFood of SnVar of Games.
+       generate-food-location.
+           compute FoodX = ((function random ())
+             * ScrSize of SnVar of Games).
+           compute FoodY = ((function random ())
+             * ScrSize of SnVar of Games).
+           add 1 to FoodX of Food of SnVar of Games.
+           add 1 to FoodY of Food of SnVar of Games.
+           if FoodX of Food of SnVar of Games < 1 then
+               move 1 to FoodX
+           end-if.
+           if FoodY of Food of SnVar of Games < 1 then
+               move 1 to FoodY
+           end-if.
+           if FoodX of Food of SnVar of Games > ScrSize then
+               move ScrSize to FoodX
+           end-if.
+           if FoodY of Food of SnVar of Games > ScrSize then
+               move ScrSize to FoodY
+           end-if.
+
+       SnakeScreenRender.
+           display SnakeScreen.
+           perform varying CrntRow of SnVar of Games
+             from 1 by 1 until CrntRow of SnVar of Games >
+             ScrSize
+               add 5 to CrntRow of SnVar of Games giving ScreenRow
+               display ScreenLine
+           end-perform.
+       shift-snake.
+           compute SnX(snake-index) = SnX(snake-index - 1).
+           compute SnY(snake-index) = SnY(snake-index - 1).
+       handle-move.
+           perform get-next-pos.
+           move 0 to SnkGrew.
+           if Cell of SnScreen(NxtY, NxtX) <> VIS-FOOD
+             and Cell of SnScreen(NxtY, NxtX) <>
+             VIS-BLANK
+      *        Ce test est uniquement pour ne pas se manger la queue
+      *        quand elle bouge
+             and not (NxtX = SnX(SnSize)
+             and NxtY = SnY(SnSize)
+             and Cell of SnScreen(SnY(SnSize),
+             SnX(SnSize)) = VIS-SNAKE-BODY)
+             then
+
+               move S-GAME-LOOSE to playing of Games
+           else
+      *        Si la dernière partie est pleine ( corps si longeur > 1
+      *        tete sinon ) le serpent doit grandir
+               if Cell of SnScreen(SnY(SnSize),
+                 SnX(SnSize)) = VIS-SNAKE-FULL then
+                   move 1 to SnkGrew
+               else
+                   if SnSize = 1 and SnkGrow > 0 then
+                       move 1 to SnkGrew
+                   else
+                       move VIS-BLANK to Cell of SnScreen(SnY(
+                             SnSize),
+                         SnX(SnSize))
+                   end-if
+               end-if
+      *        Si il doit grandir, on le fait grandir
+               if SnkGrew = 1 then
+                   add 1 to SnSize
+                   compute SnX(SnSize) = SnX(
+                       SnSize - 1)
+                   compute SnY(SnSize) = SnY(
+                       SnSize - 1)
+                   move VIS-SNAKE-BODY to Cell of SnScreen(SnY(
+                         SnSize),
+                     SnX(SnSize))
+               end-if
+
+      *        On déplace le serpent
+               perform shift-snake varying snake-index from SnSize
+                 by -1
+                 until snake-index = 1
+      *        On traite l'affichage
+               if SnSize > 1 then
+                   if SnkGrow > 0 then
+                       if SnSize = 2 and SnkGrew = 1 then
+                           move VIS-SNAKE-BODY to Cell of SnScreen(SnY(2),
+                             SnX(2))
+                       else
+                           move VIS-SNAKE-FULL to Cell of SnScreen(SnY(2),
+                             SnX(2))
+                       end-if
+                       subtract 1 from SnkGrow
+                   else
+                       move VIS-SNAKE-BODY to Cell of SnScreen(SnY(2),
+                         SnX(2))
+                   end-if
+               end-if
+      *        On affiche la tête après avoir bougé le corps
+               move VIS-SNAKE-HEAD to Cell of SnScreen(NxtY,
+                 NxtX)
+               if NxtX = FoodX and NxtY = FoodY then
+                   add 1 to SnScore
+                   move 1 to CrtFood
+                   add 1 to SnkGrow
+               end-if
+               move NxtX to SnX(1)
+               move NxtY to SnY(1)
+               move CurMvmnt to OldMvmnt
+           end-if.
+
+       get-next-pos.
+           move SnX(1) to NxtX.
+           move SnY(1) to NxtY.
+           evaluate true
+               when CurMvmnt = DIR-UP
+                   perform get-next-pos-up
+               when CurMvmnt = DIR-LEFT
+                   perform get-next-pos-left
+               when CurMvmnt = DIR-DOWN
+                   perform get-next-pos-down
+               when CurMvmnt = DIR-RIGHT
+                   perform get-next-pos-right
+           end-evaluate.
+       get-next-pos-up.
+           if SnY(1) = 1 then
+               move 20 to NxtY
+           else
+               subtract 1 from SnY(1) giving NxtY
+           end-if.
+       get-next-pos-left.
+           if SnX(1) = 1 then
+               move 20 to NxtX
+           else
+               subtract 1 from SnX(1) giving NxtX
+           end-if.
+       get-next-pos-down.
+           if SnY(1) = 20 then
+               move 1 to NxtY
+           else
+               add 1 to SnY(1) giving NxtY
+           end-if.
+       get-next-pos-right.
+           if SnX(1) = 20 then
+               move 1 to NxtX
+           else
+               add 1 to SnX(1) giving NxtX
+           end-if.
+
+       end program Game.
